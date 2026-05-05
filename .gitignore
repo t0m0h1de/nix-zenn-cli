@@ -1,0 +1,15 @@
+# --- Nix ---
+result
+result-*
+
+# direnv
+.direnv/
+.envrc
+
+# --- Node / pnpm ---
+node_modules/
+dist/
+.pnpm-debug.log*
+
+# --- OS ---
+.DS_Store
