@@ -1,0 +1,107 @@
+name: "Auto-update zenn-cli"
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
+
+      - name: Update flake.nix if new zenn-cli exists
+        id: bump
+        env:
+          FLAKE: flake.nix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          get_latest_version() {
+            # npm レジストリから dist-tags.latest を取り出す
+            curl -fsSL https://registry.npmjs.org/zenn-cli \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["dist-tags"]["latest"])'
+          }
+          harvest_hash() {
+            local log
+            # ダミーハッシュでビルドを失敗させ、"got: sha256-..." のヒントを抽出する
+            log="$(nix build .#default --no-link 2>&1 || true)"
+            local hash
+            hash="$(printf '%s\n' "$log" | awk '/got:[[:space:]]+sha256-/{print $2}' | tail -n 1)"
+            if [[ -z "$hash" ]]; then
+              printf '%s\n' "$log" >&2
+              return 1
+            fi
+            printf '%s\n' "$hash"
+          }
+
+          LATEST_VERSION="$(get_latest_version)"
+          CURRENT_VERSION="$(awk -F'"' '/^[[:space:]]*version = "/{print $2; exit}' "$FLAKE")"
+
+          if [[ -z "$LATEST_VERSION" || "$LATEST_VERSION" == "null" ]]; then
+            echo "Failed to fetch latest version" >&2
+            exit 1
+          fi
+
+          if [[ -z "$CURRENT_VERSION" ]]; then
+            echo "Failed to detect current version from $FLAKE" >&2
+            exit 1
+          fi
+
+          echo "Current: $CURRENT_VERSION, Latest: $LATEST_VERSION"
+
+          if [[ "$LATEST_VERSION" == "$CURRENT_VERSION" ]]; then
+            echo "Already up-to-date."
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 手順1: version フィールドを更新する
+          python3 scripts/update_flake.py replace-version "$FLAKE" "$CURRENT_VERSION" "$LATEST_VERSION"
+
+          # 手順2: 両方のハッシュをダミー値にして、Nix に正しいハッシュを出力させる
+          DUMMY_HASH="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+          python3 scripts/update_flake.py replace-block-hash "$FLAKE" "src = pkgs.fetchFromGitHub" "$DUMMY_HASH"
+          python3 scripts/update_flake.py replace-block-hash "$FLAKE" "pnpmDeps = pkgs.fetchPnpmDeps" "$DUMMY_HASH"
+
+          # 手順3: source ハッシュを採取して反映し、同じ手順を pnpm dependencies にも適用する。
+          echo "Harvesting source hash..."
+          NEW_SRC_HASH="$(harvest_hash)" || { echo "Failed to harvest source hash" >&2; exit 1; }
+          python3 scripts/update_flake.py replace-block-hash "$FLAKE" "src = pkgs.fetchFromGitHub" "$NEW_SRC_HASH"
+
+          echo "Harvesting pnpm dependencies hash..."
+          NEW_DEPS_HASH="$(harvest_hash)" || { echo "Failed to harvest dependencies hash" >&2; exit 1; }
+          python3 scripts/update_flake.py replace-block-hash "$FLAKE" "pnpmDeps = pkgs.fetchPnpmDeps" "$NEW_DEPS_HASH"
+
+          echo "Testing final build..."
+          nix build .#default
+          ./result/bin/zenn --help
+
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+          echo "latest_version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update pull request
+        if: steps.bump.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump zenn-cli to v${{ steps.bump.outputs.latest_version }}"
+          title: "chore: bump zenn-cli to v${{ steps.bump.outputs.latest_version }}"
+          body: |
+            This is an automated PR to update `zenn-cli` to version **v${{ steps.bump.outputs.latest_version }}**.
+            Smoke test has passed successfully.
+          branch: "update/zenn-cli"
+          base: "main"
+          delete-branch: true

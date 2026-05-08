@@ -1,0 +1,32 @@
+name: "Build and Cache"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v25
+      with:
+        nix_path: nixpkgs=channel:nixpkgs-unstable
+
+    - name: Setup Cachix
+      uses: cachix/cachix-action@v14
+      with:
+        name: t0m0h1de-zenn
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+    - name: Build flake
+      run: nix build .#default
+
+    - name: Run Smoke Test
+      run: |
+        ./result/bin/zenn --help
