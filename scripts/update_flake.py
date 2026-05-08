@@ -24,10 +24,7 @@ def replace_block_hash(flake_path: Path, block_name: str, hash_value: str) -> No
     # 指定ブロックを見つけて、その hash フィールドだけを1回更新する
     s = flake_path.read_text()
     name = re.escape(block_name)
-    pat = re.compile(
-        rf'({name}\s*=\s*[^\n]*\{{[\s\S]*?\nhash\s*=\s*")[^"]+(";)',
-        re.MULTILINE,
-    )
+    pat = re.compile(rf'({name}\s*\{{[\s\S]*?\n\s*hash\s*=\s*")[^"]+(";)', re.MULTILINE)
     updated, n = pat.subn(rf'\1{hash_value}\2', s, count=1)
     if n != 1:
         raise SystemExit(f"failed to replace hash in block: {block_name}")
