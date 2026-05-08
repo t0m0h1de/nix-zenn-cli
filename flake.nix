@@ -18,7 +18,7 @@
           in
           {
           pname = "zenn-cli";
-          version = "0.4.7";
+          version = "0.4.6";
 
           src = pkgs.fetchFromGitHub {
             owner = "zenn-dev";
