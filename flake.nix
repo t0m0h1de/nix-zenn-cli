@@ -58,9 +58,14 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out/bin $out/lib/packages
-            rm -rf node_modules packages/zenn-cli/node_modules
-            pnpm install --filter=zenn-cli --prod --ignore-scripts
+            rm -rf node_modules packages/zenn-cli/node_modules packages/zenn-markdown-html/node_modules
+            pnpm install --filter=zenn-cli --filter=zenn-markdown-html --prod --ignore-scripts
             cp -r node_modules $out/lib/
+            # zenn-cli has a production dependency on this workspace package.
+            # pnpm represents workspace dependencies as symlinks, so preserve
+            # the matching package layout in the output to avoid a dangling
+            # symlink after Nix's fixup phase.
+            cp -r packages/zenn-markdown-html $out/lib/packages/zenn-markdown-html
             cp -r packages/zenn-cli $out/lib/packages/zenn-cli
             makeWrapper ${pkgs.nodejs}/bin/node $out/bin/zenn \
               --add-flags $out/lib/packages/zenn-cli/dist/server/zenn.js
