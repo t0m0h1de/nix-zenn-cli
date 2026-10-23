@@ -18,13 +18,13 @@
           in
           {
           pname = "zenn-cli";
-          version = "0.5.6";
+          version = "0.5.7";
 
           src = pkgs.fetchFromGitHub {
             owner = "zenn-dev";
             repo = "zenn-editor";
             rev = "v${finalAttrs.version}";
-            hash = "sha256-fjGuGbnFDg2URD4SCBKdrAGd4xQxkDU/dlX6eWzwdS4=";
+            hash = "sha256-ZT+MRJRQ3wNoUEroP+OdK45IbAA1hvSv/L0G++ZIHRM=";
           };
 
           sourceRoot = "source";
@@ -42,7 +42,7 @@
             inherit (finalAttrs) pname version src pnpmWorkspaces;
             inherit pnpm;
             fetcherVersion = 3;
-            hash = "sha256-EObQPLRq911rc9zNUpU7za+Vl6Y/3VE3KPcJ4UII0Y4=";
+            hash = "sha256-Qnrh1Q+89KSiv09KVBj5oIIxXV3uwb1PaTiW7K8wrdY=";
           };
 
           preBuild = ''
