@@ -18,13 +18,13 @@
           in
           {
           pname = "zenn-cli";
-          version = "0.5.11";
+          version = "0.5.13";
 
           src = pkgs.fetchFromGitHub {
             owner = "zenn-dev";
             repo = "zenn-editor";
             rev = "v${finalAttrs.version}";
-            hash = "sha256-K71/sTMWLmfoKoxw3ZpQjJnS6tPUUNW0ljD8nEbCo4I=";
+            hash = "sha256-y6KMggUxAtfOZvrZLEecylH6LEjQKbXBP02WIM5yYMo=";
           };
 
           sourceRoot = "source";
